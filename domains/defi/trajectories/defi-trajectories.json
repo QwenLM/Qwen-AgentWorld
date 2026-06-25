@@ -1,0 +1,65 @@
+{
+  "domain": "defi",
+  "description": "DeFi trading, yield, risk, and payment trajectories for GenTech World",
+  "version": "1.0.0",
+  "created": "2026-06-25",
+  "trajectories": [
+    {
+      "id": "defi-001",
+      "type": "lp_management",
+      "pair": "AVAX/USDC",
+      "shape": "bid-ask",
+      "fee_tier": "5bps",
+      "initial_state": {
+        "price": 6.17,
+        "range_min": 6.3275,
+        "range_max": 6.5594,
+        "avax_amount": 1.6843,
+        "usdc_amount": 52.72,
+        "total_value": 63.12,
+        "in_range": false
+      },
+      "decision": {
+        "action": "rebalance_to_curve",
+        "reasoning": "Price dropped below range. Curve shape provides better fee capture across wider range.",
+        "expected_outcome": "Capture fees as price recovers, reduce impermanent loss"
+      },
+      "outcome": {
+        "new_shape": "curve",
+        "fees_earned": 0.50,
+        "time_to_recover": "30 days"
+      }
+    },
+    {
+      "id": "defi-002",
+      "type": "payment",
+      "service": "signal402",
+      "amount": 0.01,
+      "network": "base",
+      "asset": "USDC",
+      "decision": {
+        "action": "pay_for_listing",
+        "reasoning": "Get listed on x402 directory for agent discovery",
+        "expected_outcome": "Increased API calls and revenue"
+      },
+      "outcome": {
+        "listed": true,
+        "discovery_improvement": "pending"
+      }
+    },
+    {
+      "id": "defi-003",
+      "type": "risk_assessment",
+      "token": "unknown",
+      "decision": {
+        "action": "check_rugcheck",
+        "reasoning": "Before trading any token, verify safety with 11-factor scoring",
+        "expected_outcome": "Avoid rug pulls and honeypots"
+      },
+      "outcome": {
+        "risk_score": "pending",
+        "action_taken": "pending"
+      }
+    }
+  ]
+}
