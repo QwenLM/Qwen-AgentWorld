@@ -15,7 +15,7 @@
   <img src="assets/group_capybaras_flat.png" alt="Qwen-AgentWorld" width="1000px"/>
 </div>
 
-Welcome to the GitHub repository of Qwen-AgentWorld. Here, you can find official information about Qwen-AgentWorld, post your questions ([Issues](https://github.com/QwenLM/Qwen-AgentWorld/issues)), and share your ideas with the community ([Discussions](https://github.com/QwenLM/Qwen-AgentWorld/discussions)).
+Welcome to the GitHub repository of Qwen-AgentWorld. Here, you can find official information about Qwen-AgentWorld, post your questions ([Issues](https://github.com/QwenLM/Qwen-AgentWorld/issues)), and share your ideas with the community ([Discussions](https://github.com/QwenLM/Qwen-AgentWorld/discussions)). See the [FAQ](docs/FAQ.md) for common questions about benchmark comparisons and evaluation prompts.
 
 
 ## News
