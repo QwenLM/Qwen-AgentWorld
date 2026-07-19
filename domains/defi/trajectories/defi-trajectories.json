@@ -1,0 +1,291 @@
+{
+  "domain": "defi",
+  "description": "DeFi trading, yield, risk, and payment trajectories for GenTech World",
+  "version": "2.0.0",
+  "created": "2026-06-25",
+  "trajectories": [
+    {
+      "id": "defi-001",
+      "type": "lp_management",
+      "pair": "AVAX/USDC",
+      "shape": "bid-ask",
+      "fee_tier": "5bps",
+      "initial_state": {
+        "price": 6.17,
+        "range_min": 6.3275,
+        "range_max": 6.5594,
+        "avax_amount": 1.6843,
+        "usdc_amount": 52.72,
+        "total_value": 63.12,
+        "in_range": false
+      },
+      "decision": {
+        "action": "rebalance_to_curve",
+        "reasoning": "Price dropped below range. Curve shape provides better fee capture across wider range.",
+        "expected_outcome": "Capture fees as price recovers, reduce impermanent loss"
+      },
+      "outcome": {
+        "new_shape": "curve",
+        "fees_earned": 0.5,
+        "time_to_recover": "30 days"
+      }
+    },
+    {
+      "id": "defi-002",
+      "type": "payment",
+      "service": "signal402",
+      "amount": 0.01,
+      "network": "base",
+      "asset": "USDC",
+      "decision": {
+        "action": "pay_for_listing",
+        "reasoning": "Get listed on x402 directory for agent discovery",
+        "expected_outcome": "Increased API calls and revenue"
+      },
+      "outcome": {
+        "listed": true,
+        "discovery_improvement": "pending"
+      }
+    },
+    {
+      "id": "defi-003",
+      "type": "risk_assessment",
+      "token": "unknown",
+      "decision": {
+        "action": "check_rugcheck",
+        "reasoning": "Before trading any token, verify safety with 11-factor scoring",
+        "expected_outcome": "Avoid rug pulls and honeypots"
+      },
+      "outcome": {
+        "risk_score": "pending",
+        "action_taken": "pending"
+      }
+    },
+    {
+      "id": "defi-004",
+      "type": "x402_compliance_valid",
+      "endpoint": "/v1/wallet/analyze",
+      "description": "Valid x402 compliance check \u2014 all required fields present and correctly structured",
+      "initial_state": {
+        "url": "https://api.gentechlabs.net/v1/wallet/analyze",
+        "expected_checks": 20,
+        "constraints": {
+          "max_amount": "50000",
+          "allowed_networks": [
+            "eip155:8453"
+          ],
+          "allowed_assets": [
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        }
+      },
+      "request": {
+        "method": "GET",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "x402-Compliance-Scanner/0.1.0"
+        }
+      },
+      "response_402": {
+        "status": 402,
+        "x402version": "x402-v2",
+        "accepts": [
+          {
+            "type": "x402",
+            "scheme": "exact",
+            "network": "eip155:8453",
+            "amount": "25000",
+            "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "payTo": "0x7EBff1DbD34172C5b55697654006C9642b5236a3"
+          }
+        ],
+        "network": "eip155:8453",
+        "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "amount": "25000",
+        "payment_address": "0x7EBff1DbD34172C5b55697654006C9642b5236a3"
+      },
+      "decision": {
+        "action": "validate_compliance",
+        "checks_passed": [
+          "http_402",
+          "field_status",
+          "field_x402version",
+          "x402version_format",
+          "field_accepts",
+          "accepts_nonempty",
+          "accepts[0].type",
+          "accepts[0].scheme",
+          "accepts[0].network",
+          "accepts[0].amount",
+          "accepts[0].asset",
+          "accepts[0].payTo",
+          "network_valid",
+          "amount_format",
+          "payment_address",
+          "cors"
+        ],
+        "checks_failed": [],
+        "constraints_applied": {
+          "amount_under_max": true,
+          "network_allowed": true,
+          "asset_allowed": true,
+          "address_consistent": true
+        },
+        "verdict": "PASS \u2014 all 16 checks passed, all constraints satisfied"
+      },
+      "outcome": {
+        "result": "PASS",
+        "summary": "16/16 checks passed",
+        "next_step": "proceed_to_settlement"
+      }
+    },
+    {
+      "id": "defi-005",
+      "type": "x402_compliance_tampered",
+      "endpoint": "/v1/wallet/analyze",
+      "description": "Tampered x402 response \u2014 swapped payTo address and inflated amount. Verifier must reject.",
+      "initial_state": {
+        "url": "https://api.gentechlabs.net/v1/wallet/analyze",
+        "expected_checks": 16,
+        "constraints": {
+          "max_amount": "50000",
+          "allowed_networks": [
+            "eip155:8453"
+          ],
+          "allowed_pay_to": [
+            "0x7EBff1DbD34172C5b55697654006C9642b5236a3"
+          ]
+        }
+      },
+      "request": {
+        "method": "GET",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "x402-Compliance-Scanner/0.1.0"
+        }
+      },
+      "response_402": {
+        "status": 402,
+        "x402version": "x402-v2",
+        "accepts": [
+          {
+            "type": "x402",
+            "scheme": "exact",
+            "network": "eip155:8453",
+            "amount": "10000000",
+            "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "payTo": "0xEvilWalletAddress1234567890123456789012345678"
+          }
+        ],
+        "network": "eip155:8453",
+        "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "amount": "10000000",
+        "payment_address": "0xEvilWalletAddress1234567890123456789012345678"
+      },
+      "decision": {
+        "action": "validate_compliance",
+        "checks_passed": [
+          "http_402",
+          "field_status",
+          "field_x402version",
+          "field_accepts",
+          "accepts_nonempty",
+          "network_valid",
+          "amount_format"
+        ],
+        "checks_failed": [
+          "PAY_TO_MISMATCH: Expected 0x7EBff1... got 0xEvilW...",
+          "AMOUNT_EXCEEDS_MAX: 10000000 > 50000 (max_amount)",
+          "accepts[0].amount exceeds allowed maximum",
+          "accepts[0].payTo not in allowlist"
+        ],
+        "constraints_applied": {
+          "amount_under_max": false,
+          "pay_to_allowed": false,
+          "address_consistent": false
+        },
+        "verdict": "BLOCKED \u2014 4 critical violations: payTo address tampered, amount inflated 400x"
+      },
+      "outcome": {
+        "result": "BLOCKED",
+        "summary": "12/16 checks passed \u2014 payment blocked by compliance verifier before settlement",
+        "next_step": "alert: payTo address does not match any trusted address. Do NOT settle."
+      }
+    },
+    {
+      "id": "defi-006",
+      "type": "x402_settlement_flow",
+      "endpoint": "/v1/agent",
+      "description": "Full x402 settlement flow: 402 challenge \u2192 payment auth \u2192 200 resource response",
+      "initial_state": {
+        "url": "https://api.gentechlabs.net/v1/agent",
+        "balance_before": {
+          "USDC": "500.00",
+          "network": "eip155:8453"
+        }
+      },
+      "steps": [
+        {
+          "step": 1,
+          "action": "request_resource",
+          "description": "Agent requests gated resource without payment",
+          "response_code": 402,
+          "response_body": {
+            "status": 402,
+            "x402version": "x402-v2",
+            "accepts": [
+              {
+                "type": "x402",
+                "scheme": "exact",
+                "network": "eip155:8453",
+                "amount": "25000",
+                "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                "payTo": "0x7EBff1DbD34172C5b55697654006C9642b5236a3"
+              }
+            ],
+            "network": "eip155:8453",
+            "asset": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "amount": "25000",
+            "payment_address": "0x7EBff1DbD34172C5b55697654006C9642b5236a3"
+          }
+        },
+        {
+          "step": 2,
+          "action": "verify_compliance",
+          "description": "Agent runs compliance verifier",
+          "verdict": "PASS",
+          "checks_summary": "16/16 checks passed"
+        },
+        {
+          "step": 3,
+          "action": "settle_payment",
+          "description": "Agent signs and submits settlement with Payment header",
+          "payment_auth": "scheme=exact;network=eip155:8453;amount=25000",
+          "response_code": 200,
+          "confirmations": [
+            "Payment-Response header present",
+            "Resource body valid JSON"
+          ]
+        },
+        {
+          "step": 4,
+          "action": "verify_balance",
+          "description": "Agent verifies post-settlement balance",
+          "balance_after": "499.97",
+          "deduction": "0.03 USDC (25000 units at USDC 6 decimals)",
+          "settlement_confirmed": true
+        }
+      ],
+      "outcome": {
+        "result": "SETTLED",
+        "total_steps": 4,
+        "gas_used": 0,
+        "settlement_time": "~3 seconds",
+        "compliance_verified": true
+      }
+    }
+  ],
+  "updated": "2026-07-19"
+}
