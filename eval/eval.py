@@ -88,16 +88,28 @@ def run_inference(
         subtask = get_subtask(job)
 
         system_prompt = job.get("system_str", "")
-        current_prompt = job.get("current_prompt", "")
-        if not current_prompt:
-            prompts = job.get("prompt", [])
-            turn_idx = job.get("turn_idx", 1) - 1
-            if isinstance(prompts, list) and turn_idx < len(prompts):
-                current_prompt = prompts[turn_idx]
+        prompts = job.get("prompt", [])
+        responses = job.get("response", [])
+        if isinstance(prompts, str):
+            prompts = [prompts]
+        if isinstance(responses, str):
+            responses = [responses]
+        turn_idx = max(job.get("turn_idx", 1) - 1, 0)  # 0-indexed current turn
 
+        # Reconstruct the interaction history as interleaved user (action) /
+        # assistant (observation) turns, then append the current action. This
+        # mirrors the trajectory schema (system_prompt + [turn_1..turn_T]) and
+        # matches the context that build_judge_messages() reconstructs, so the
+        # model predicts turn t with the same prior state the judge scores against.
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
+        for j in range(min(turn_idx, len(prompts), len(responses))):
+            messages.append({"role": "user", "content": prompts[j]})
+            messages.append({"role": "assistant", "content": responses[j]})
+        current_prompt = job.get("current_prompt", "")
+        if not current_prompt and turn_idx < len(prompts):
+            current_prompt = prompts[turn_idx]
         messages.append({"role": "user", "content": current_prompt})
 
         try:
