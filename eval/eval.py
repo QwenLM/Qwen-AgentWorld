@@ -90,27 +90,17 @@ def run_inference(
         system_prompt = job.get("system_str", "")
         prompts = job.get("prompt", [])
         responses = job.get("response", [])
-        if isinstance(prompts, str):
-            prompts = [prompts]
-        if isinstance(responses, str):
-            responses = [responses]
-        turn_idx = max(job.get("turn_idx", 1) - 1, 0)  # 0-indexed current turn
+        turn_idx = job["turn_idx"] - 1
 
-        # Reconstruct the interaction history as interleaved user (action) /
-        # assistant (observation) turns, then append the current action. This
-        # mirrors the trajectory schema (system_prompt + [turn_1..turn_T]) and
-        # matches the context that build_judge_messages() reconstructs, so the
-        # model predicts turn t with the same prior state the judge scores against.
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        for j in range(min(turn_idx, len(prompts), len(responses))):
-            messages.append({"role": "user", "content": prompts[j]})
-            messages.append({"role": "assistant", "content": responses[j]})
-        current_prompt = job.get("current_prompt", "")
-        if not current_prompt and turn_idx < len(prompts):
-            current_prompt = prompts[turn_idx]
-        messages.append({"role": "user", "content": current_prompt})
+        for prompt, response in zip(prompts[:turn_idx], responses[:turn_idx]):
+            messages.extend([
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ])
+        messages.append({"role": "user", "content": prompts[turn_idx]})
 
         try:
             response = client.chat.completions.create(
@@ -238,7 +228,7 @@ def run_judge(
                 "strengths": parsed.get("strengths", []),
                 "weaknesses": parsed.get("weaknesses", []),
                 "extracted_output": model_output,
-                "judge_raw_output": parsed.get("raw_output", ""),
+                "judge_raw_output": parsed.get("judge_raw_output", ""),
             })
         else:
             job.update({
