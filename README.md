@@ -85,49 +85,71 @@ Qwen-AgentWorld-397B-A17B achieves the highest overall score (58.71), outperform
 
 **Generalizable Environment Scaling.** Sim RL with Qwen-AgentWorld-397B-A17B on 4k out-of-distribution OpenClaw environments:
 
-| Model | Claw-Eval | QwenClawBench |
-|:------|:---------:|:-------------:|
-| Qwen3.5-35B-A3B | 65.4 | 47.9 |
-| + Sim RL (w/ Qwen3.6-Plus) | 66.7 | 47.8 |
-| + Sim RL (w/ Qwen-AgentWorld-397B-A17B) | **69.7** | **55.0** |
-| Δ | +4.3 | +7.1 |
-
-**Controllable Simulation: MCP.** Environment Adaptation --- Control instructions inject targeted perturbations to expose agent weaknesses:
-
-| Model | Tool Decathlon | MCPMark |
-|:------|:--------------:|:-------:|
-| Qwen3.5-35B-A3B-SFT | 32.4 | 21.5 |
-| + Sim RL (uncontrolled) | 31.5 | 24.6 |
-| + Sim RL (controlled) | **36.1** | **33.8** |
-| Δ | +3.7 | +12.3 |
-
-**Controllable Simulation: Search.** Fictional-World Construction -- agents trained in fully invented, self-consistent worlds generalize to real search tasks:
-
-| Model | WideSearch F1 Item | WideSearch F1 Row |
-|:------|:------------------:|:-----------------:|
-| Qwen3.5-35B-A3B-SFT | 34.02 | 13.72 |
-| + Sim RL (controlled) | **50.31** | **24.21** |
-| Δ | +16.29 | +10.49 |
-| | | |
-| Qwen3.5-397B-A17B-SFT | 70.11 | 45.69 |
-| + Sim RL (controlled) | **73.98** | **51.74** |
-| Δ | +3.87 | +6.05 |
-
-**Agent Foundation Model.** LWM RL warm-up on single-turn, non-agentic trajectories transfers to multi-turn, tool-calling agentic tasks:
-
-| | Terminal-Bench 2.0 | SWE-Bench Verified | SWE-Bench Pro | WideSearch F1 Item | Claw-Eval | QwenClawBench | BFCL v4 |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| | *In Domain* | | | | *Out of Domain* | | |
-| Qwen3.5-35B-A3B-SFT | 33.25 | 64.47 | 42.18 | 33.38 | 53.60 | 39.76 | 62.29 |
-| w/ LWM RL | **39.55** | **67.86** | **47.42** | **46.17** | **64.88** | **49.43** | **71.25** |
-| Δ | +6.30 | +3.39 | +5.24 | +12.79 | +11.28 | +9.67 | +8.96 |
-
-For detailed results, please check out the [blog](https://qwen.ai/blog?id=qwen-agentworld) and the [technical report](http://arxiv.org/abs/2606.24597).
-
-
-## Quickstart
-
-### Deployment
+> [!NOTE]
+> **Official OpenClaw SimRL prompt.** For OpenClaw/Claw-Agent-style environments, we use Qwen-AgentWorld as a language world model with the following system prompt. The user message should contain the task instruction, optional interaction history, the current OpenClaw observation/state, and the action to simulate.
+>
+> ```text
+> # Role and Objective
+>
+> You are an **OpenClaw World Model** — a precise simulator for OpenClaw agent environments. Your task is to predict the exact next environment observation after an agent action is executed.
+>
+> Given:
+> 1. **Historical Context** (Optional): Previous interactions in the same trajectory
+> 2. **Task Instruction**: The user goal for the OpenClaw task
+> 3. **Current State**: The current environment observation/state visible to the agent
+> 4. **Action**: The agent action to execute in the environment
+>
+> Predict the **exact next environment observation** after the action completes.
+>
+> ## Core Responsibilities
+>
+> 1. **State Prediction**: Generate the complete next OpenClaw observation after action execution
+> 2. **Context Maintenance**: Track navigation state, UI state, files, tool results, and any persistent environment state across turns
+> 3. **Behavioral Fidelity**: Stay faithful to realistic OpenClaw environment behavior, including invalid actions and no-op actions
+>
+> ## State Modeling Rules
+>
+> - Preserve the original observation format exactly
+> - Keep ordering, labels, identifiers, coordinates, and structured fields consistent unless the action changes them
+> - If the action has no visible or observable effect, return the unchanged state
+> - Use prior turns as context when environment state persists across actions
+> - Do not add hidden metadata or rewrite the observation into a different schema
+>
+> ## Action Modeling Rules
+>
+> - Treat the action supplied in the user message as the ground-truth action specification
+> - Infer the next state from the semantics of the action and the current observation
+> - Do not assume a closed action space; OpenClaw tasks may contain browser, UI, tool, or code-like actions depending on the environment
+>
+> ## Output Requirements
+>
+> First, think step by step to explain your reasoning. Then, provide the final predicted OpenClaw observation wrapped strictly within the `<predicted_observation></predicted_observation>` tags.
+>
+> Inside the tags, output only the full next observation with no extra commentary.
+> ```
+> [!NOTE]
+> **OpenClaw SimRL prompt status.** This repository does not currently include a canonical SimRL/OpenClaw prompt or OpenClaw task configuration. The only prompt sources of truth shipped here are the seven AgentWorldBench domain templates under [`prompts/`](prompts/) and the per-domain paths in [`eval/lwm_eval_utils/task_configs.py`](eval/lwm_eval_utils/task_configs.py).
+>
+> For OpenClaw/Claw-Agent-style SimRL, use the prompt released with your OpenClaw/SimRL training configuration if available. If you need a repository-local starting point, select the closest domain template from `prompts/` and keep the same message contract used by AgentWorldBench samples: `system_str` is the system prompt, while the user message contains the trajectory context and current action.
+>
+> Expected user message template:
+>
+> ```text
+> ### Turn {turn_idx}
+> **Task Instruction:**
+> {task_instruction}
+>
+> **Historical Context:**
+> {previous_turns_optional}
+>
+> **Current State:**
+> {current_openclaw_observation}
+>
+> **Action:**
+> {action_to_simulate}
+> ```
+>
+> The model response should include the predicted next observation in a `<predicted_observation></predicted_observation>` block, preserving the observation format used by the environment.
 
 Qwen-AgentWorld-35B-A3B is supported by multiple inference frameworks. Here we demonstrate the usage of SGLang and vLLM.
 
