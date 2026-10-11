@@ -79,17 +79,16 @@ def parse_judge_output(raw_output: str, response_tag: str) -> Dict[str, Any]:
 
         # Extract and validate scores
         scores = _extract_scores(result)
-        if not scores:
+        if not scores or any(value < 1 for value in scores.values()):
             logger.warning("Missing or invalid 'scores' field in LLM Judge output")
             logger.debug(f"Available keys: {list(result.keys())}")
             return _get_error_result(f"Invalid scores. Keys: {list(result.keys())}", raw_output)
 
-        valid_scores = [v for v in scores.values() if v > 0]
         return {
             "strengths": _to_list(result.get("strengths", [])),
             "weaknesses": _to_list(result.get("weaknesses", [])),
             "scores": scores,
-            "total_score": sum(valid_scores) / len(valid_scores) if valid_scores else 0,
+            "total_score": sum(scores.values()) / len(scores),
             "success": True,
             "judge_raw_output": raw_output,
         }

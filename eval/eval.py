@@ -273,7 +273,11 @@ def aggregate_scores(jobs: List[Dict[str, Any]]) -> None:
 
     for subtask in sorted(subtask_jobs.keys()):
         sj = subtask_jobs[subtask]
-        valid = [j for j in sj if j.get("failed", 1.0) == 0.0]
+        valid = [
+            j for j in sj
+            if j.get("failed", 1.0) == 0.0
+            and all(j.get(dim, 0) > 0 for dim in SCORE_DIMENSIONS + ["total_score"])
+        ]
         failed = len(sj) - len(valid)
 
         display_name = domain_display.get(subtask, subtask.capitalize())
