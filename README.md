@@ -270,6 +270,10 @@ python eval.py score --predictions ./results/judged.jsonl
 
 The judge prompts used for scoring are located in `prompts/{domain}/judge_system_prompt.txt`. The world model system prompts in `prompts/{domain}/system_prompt.txt` are provided as **reference templates**; during evaluation, the system prompt from each sample's `system_str` field is used instead.
 
+For long runs, add `--checkpoint ./results/infer.checkpoint.jsonl` to `infer` or `--checkpoint ./results/judge.checkpoint.jsonl` to `judge`. Repeating the same command resumes completed samples without calling the model or judge again. The checkpoint must be separate from the input and final output files; it stores sample results and a hash of the inputs, evaluation settings and evaluator code, but not API keys. A mismatch or an incomplete checkpoint record stops the run without modifying the checkpoint.
+
+With a checkpoint, an inference error or exhausted judge retries stop the run so that the unfinished sample is retried on resume. Samples already lacking a model generation remain failed. If a process stops after the server handled a request but before its result was saved, resuming can repeat that request. Use separate output directories for concurrent runs; a checkpoint is locked while it is in use.
+
 ### Evaluation Output
 
 The `score` command outputs per-domain and overall results:
