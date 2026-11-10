@@ -46,6 +46,7 @@ from lwm_eval_utils import (
     clean_response_marker,
     load_judge_system_prompts,
 )
+from lwm_eval_utils.checkpoint import RunCheckpoint, checkpoint_signature
 
 INVALID_VALUE = 0
 
@@ -81,6 +82,7 @@ def run_inference(
     model_name: str,
     max_tokens: int = 32768,
     temperature: float = 0.6,
+    on_complete=None,
 ) -> List[Dict[str, Any]]:
     """Run world model inference on all jobs."""
     total = len(jobs)
@@ -112,9 +114,15 @@ def run_inference(
             gen = response.choices[0].message.content or ""
         except Exception as e:
             logger.warning(f"[{i+1}/{total}] Inference failed for {job.get('id')}: {e}")
+            if on_complete:
+                raise RuntimeError("Inference failed; rerun with the same checkpoint to retry") from e
             gen = ""
 
+        if on_complete and not gen:
+            raise RuntimeError("Inference returned an empty response; rerun with the same checkpoint to retry")
         job["gen"] = gen
+        if on_complete:
+            on_complete(job)
         if (i + 1) % 10 == 0 or (i + 1) == total:
             logger.info(f"[{i+1}/{total}] Inference progress")
 
@@ -175,9 +183,12 @@ def run_judge(
     max_tokens: int = 32768,
     temperature: float = 0.6,
     max_retries: int = 3,
+    on_complete=None,
+    judge_system_prompts=None,
 ) -> List[Dict[str, Any]]:
     """Run LLM Judge scoring on all jobs."""
-    judge_system_prompts = load_judge_system_prompts()
+    if judge_system_prompts is None:
+        judge_system_prompts = load_judge_system_prompts()
     total = len(jobs)
 
     for i, job in enumerate(jobs):
@@ -185,6 +196,8 @@ def run_judge(
         if not gen:
             job["failed"] = 1.0
             job["error_message"] = "No model generation"
+            if on_complete:
+                on_complete(job)
             continue
 
         subtask = get_subtask(job)
@@ -231,6 +244,8 @@ def run_judge(
                 "judge_raw_output": parsed.get("judge_raw_output", ""),
             })
         else:
+            if on_complete:
+                raise RuntimeError("Judge scoring failed; rerun with the same checkpoint to retry")
             job.update({
                 "total_score": INVALID_VALUE,
                 "failed": 1.0,
@@ -238,6 +253,8 @@ def run_judge(
                 "extracted_output": model_output,
             })
 
+        if on_complete:
+            on_complete(job)
         if (i + 1) % 10 == 0 or (i + 1) == total:
             logger.info(f"[{i+1}/{total}] Judge progress")
 
@@ -301,6 +318,26 @@ def aggregate_scores(jobs: List[Dict[str, Any]]) -> None:
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
+def same_path(first, second):
+    first, second = Path(first), Path(second)
+    return first.resolve() == second.resolve() or (
+        first.exists() and second.exists() and os.path.samefile(first, second)
+    )
+
+
+def run_with_checkpoint(jobs, path, settings, runner):
+    if not path:
+        return runner(jobs, None)
+    signature = checkpoint_signature(jobs, settings)
+    with RunCheckpoint(path, signature, jobs) as checkpoint:
+        remaining = jobs[len(checkpoint.completed):]
+        logger.info(f"Resuming with {len(checkpoint.completed)}/{len(jobs)} samples complete")
+        runner(remaining, checkpoint.append)
+        if len(checkpoint.completed) != len(jobs):
+            raise ValueError("Evaluation finished without checkpointing every sample")
+        return checkpoint.completed
+
+
 def main():
     parser = argparse.ArgumentParser(description="AgentWorldBench Evaluation")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -314,6 +351,7 @@ def main():
     p_infer.add_argument("--output-dir", default="./results", help="Output directory")
     p_infer.add_argument("--max-tokens", type=int, default=32768)
     p_infer.add_argument("--temperature", type=float, default=0.6)
+    p_infer.add_argument("--checkpoint", help="Save progress here and resume a matching run")
 
     # judge
     p_judge = subparsers.add_parser("judge", help="Run LLM judge scoring")
@@ -325,6 +363,7 @@ def main():
     p_judge.add_argument("--max-tokens", type=int, default=32768)
     p_judge.add_argument("--temperature", type=float, default=0.6)
     p_judge.add_argument("--max-retries", type=int, default=3)
+    p_judge.add_argument("--checkpoint", help="Save progress here and resume a matching run")
 
     # score
     p_score = subparsers.add_parser("score", help="Aggregate scores from judged results")
@@ -333,29 +372,50 @@ def main():
     args = parser.parse_args()
 
     if args.command == "infer":
+        out_dir = Path(args.output_dir)
+        out_path = out_dir / "predictions.jsonl"
+        if args.checkpoint and same_path(args.checkpoint, out_path):
+            parser.error("--checkpoint must differ from the output file")
         jobs = load_data(args.data_dir)
         client = OpenAI(base_url=args.model_base_url, api_key=args.model_api_key)
-        jobs = run_inference(jobs, client, args.model_name, args.max_tokens, args.temperature)
+        settings = {"stage": "infer", "base_url": args.model_base_url, "model": args.model_name,
+                    "max_tokens": args.max_tokens, "temperature": args.temperature}
+        jobs = run_with_checkpoint(
+            jobs, args.checkpoint, settings,
+            lambda remaining, save: run_inference(
+                remaining, client, args.model_name, args.max_tokens, args.temperature, on_complete=save
+            ),
+        )
 
-        out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / "predictions.jsonl"
         with open(out_path, "w") as f:
             for job in jobs:
                 f.write(json.dumps(job, ensure_ascii=False) + "\n")
         logger.info(f"Predictions saved to {out_path}")
 
     elif args.command == "judge":
+        out_dir = Path(args.output_dir)
+        out_path = out_dir / "judged.jsonl"
+        if args.checkpoint and (same_path(args.checkpoint, out_path) or same_path(args.checkpoint, args.predictions)):
+            parser.error("--checkpoint must differ from the input and output files")
         with open(args.predictions, "r") as f:
             jobs = [json.loads(line) for line in f if line.strip()]
 
         api_key = args.judge_api_key or os.environ.get("OPENAI_API_KEY", "EMPTY")
         client = OpenAI(base_url=args.judge_base_url, api_key=api_key)
-        jobs = run_judge(jobs, client, args.judge_model, args.max_tokens, args.temperature, args.max_retries)
+        prompts = load_judge_system_prompts()
+        settings = {"stage": "judge", "base_url": args.judge_base_url, "model": args.judge_model,
+                    "max_tokens": args.max_tokens, "temperature": args.temperature,
+                    "max_retries": args.max_retries, "prompts": prompts}
+        jobs = run_with_checkpoint(
+            jobs, args.checkpoint, settings,
+            lambda remaining, save: run_judge(
+                remaining, client, args.judge_model, args.max_tokens, args.temperature,
+                args.max_retries, on_complete=save, judge_system_prompts=prompts,
+            ),
+        )
 
-        out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / "judged.jsonl"
         with open(out_path, "w") as f:
             for job in jobs:
                 f.write(json.dumps(job, ensure_ascii=False) + "\n")
